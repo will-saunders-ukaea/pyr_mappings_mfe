@@ -1,0 +1,18 @@
+# vtk DataFile Version 2.0
+NESO Unstructured Grid
+ASCII
+DATASET UNSTRUCTURED_GRID
+
+POINTS 5 float
+-1 -1 -0.6 
+-0.5 -1 -0.6 
+-0.479483 -0.474973 -0.661479 
+-1 -0.5 -0.6 
+-0.804335 -0.747833 -0.429676 
+
+CELLS 8 24
+2 0 1 2 1 2 2 2 3 2 3 0 2 1 4 2 2 4 2 3 4 2 4 0 
+
+CELL_TYPES 8
+3 3 3 3 3 3 3 3 
+
