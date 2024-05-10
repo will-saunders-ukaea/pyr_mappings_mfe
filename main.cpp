@@ -38,56 +38,6 @@ using namespace Nektar;
 using namespace Nektar::SolverUtils;
 using namespace Nektar::SpatialDomains;
 
-class Pyr : public SpatialDomains::PyrGeom {
-public:
-  template <typename ...T>
-  Pyr(
-    T... t
-  ):
-    PyrGeom(t...)
-  {}
-
-  inline double print_coord_diff(Array<OneD, NekDouble> &Lcoords){
-    Array<OneD, NekDouble> c_old(3);
-    for (int dx = 0; dx < 3; dx++) {
-      c_old[dx] = GetCoord(dx, Lcoords);
-    }
-    nprint("Lcoord:        ", Lcoords[0], Lcoords[1], Lcoords[2]);
-    nprint("OLD   physical:", c_old[0], c_old[1], c_old[2]);
-    
-    /**
-     * This is taken from the straight edge newton iteration code for X^-1 that
-     * appeared around 5.4.0.
-     */
-    Array<OneD, NekDouble> var(8, 1.);
-    NekDouble xmap, ymap, zmap;
-    auto lambda = [&](auto xi){
-      var[1] = xi[0];
-      var[2] = xi[1];
-      var[3] = xi[2];
-      var[4] = xi[0] * xi[1];
-      var[5] = xi[1] * xi[2];
-      var[6] = xi[0] * xi[2];
-      var[7] = var[4] * xi[2];
-      // calculate the global point corresponding to xi
-      xmap =
-          Vmath::Dot(m_isoParameter[0].size(), var, 1, m_isoParameter[0], 1);
-      ymap =
-          Vmath::Dot(m_isoParameter[0].size(), var, 1, m_isoParameter[1], 1);
-      zmap =
-          Vmath::Dot(m_isoParameter[0].size(), var, 1, m_isoParameter[2], 1);
-    };
-    
-    lambda(Lcoords);
-    nprint("NEW   physical:", xmap, ymap, zmap);
-
-    double n[3] = {xmap, ymap, zmap};
-    return l2_norm(n, c_old);
-  }
-
-};
-
-
 auto make_problem_pyramid(){
 
   std::map<int, std::shared_ptr<PointGeom>> vertices;
@@ -158,7 +108,7 @@ auto make_problem_pyramid(){
   ff[2] = faces.at(223);
   ff[3] = faces.at(287);
   ff[4] = faces.at(382);
-  auto pyr = std::make_shared<Pyr>(0, ff);
+  auto pyr = std::make_shared<PyrGeom>(0, ff);
  
   pyr->GetGeomFactors();
   pyr->Setup();
@@ -169,44 +119,11 @@ auto make_problem_pyramid(){
 
 int main(int argc, char ** argv){
   auto pyr = make_problem_pyramid();
-  
-  // Check the maps from reference space to physical space are consistent.
-  nprint("Vertices match:");
-  Array<OneD, NekDouble> xi_print(3);
-  xi_print[0] = -1.0;
-  xi_print[1] = -1.0;
-  xi_print[2] = -1.0;
-  pyr->print_coord_diff(xi_print);
-  xi_print[0] =  1.0;
-  xi_print[1] = -1.0;
-  xi_print[2] = -1.0;
-  pyr->print_coord_diff(xi_print);
-  xi_print[0] =  1.0;
-  xi_print[1] =  1.0;
-  xi_print[2] = -1.0;
-  pyr->print_coord_diff(xi_print);
-  xi_print[0] = -1.0;
-  xi_print[1] =  1.0;
-  xi_print[2] = -1.0;
-  pyr->print_coord_diff(xi_print);
-  xi_print[0] = -1.0;
-  xi_print[1] = -1.0;
-  xi_print[2] =  1.0;
-  pyr->print_coord_diff(xi_print);
 
-  nprint("\nInterior differs:");
-  xi_print[0] =  0.0;
-  xi_print[1] =  0.0;
-  xi_print[2] =  0.0;
-  pyr->print_coord_diff(xi_print);
-  xi_print[0] = -0.2;
-  xi_print[1] = -0.2;
-  xi_print[2] = -0.2;
-  pyr->print_coord_diff(xi_print);
+  Array<OneD, NekDouble> xi_print(3);
   xi_print[0] = -0.125;
   xi_print[1] = -0.125;
   xi_print[2] =  0.125;
-  pyr->print_coord_diff(xi_print);
 
   // Check that X and X^-1 are consistent
   nprint("\nConsistency check, mapping point from physical to local and back to physical:");
