@@ -117,39 +117,114 @@ auto make_problem_pyramid(){
 }
 
 
+auto make_linear_problem_pyramid(){
+
+  int vertex_ids[5] = { 38, 53, 56, 41, 101 };
+  NekDouble coords[15] = {
+    0,   0,  -0.6, 
+    0.5, 0.0, -0.6, 
+    0.55, 0.5425, -0.6, 
+    0.0, 0.5, -0.6, 
+    0.233551, 0.20215, -0.372506
+  };
+  int edge_ids[8] = {116, 123, 124, 86,  239, 231, 230, 249};
+  int edges[16] = {53, 38, 53, 56, 56, 41, 38, 41, 101, 38,53, 101, 56, 101, 41, 101};
+
+  int face_edge_counts[5] = {4,3,3,3,3};
+  int face_ids[5] = {90, 185, 177, 213, 198};
+  int faces[] = {116, 123, 124, 86, 116, 239, 231, 123, 231, 230, 124, 230, 249, 86, 249, 239};
+
+  int pyr_faces[] = {90, 185, 177, 213, 198};
+
+
+  std::map<int, std::shared_ptr<PointGeom>> m_vertices;
+  std::map<int, std::shared_ptr<SegGeom>> m_edges;
+  std::map<int, std::shared_ptr<Geometry2D>> m_faces;
+
+  std::shared_ptr<PointGeom> ends[2];
+  std::shared_ptr<SegGeom> ee[4];
+  std::shared_ptr<Geometry2D> ff[5];
+
+  for(int vx=0 ; vx<5 ; vx++){
+    const int id = vertex_ids[vx];
+    NekDouble x = coords[vx * 3 + 0];
+    NekDouble y = coords[vx * 3 + 1];
+    NekDouble z = coords[vx * 3 + 2];
+    m_vertices[id] = std::make_shared<PointGeom>(3, id, x,y,z);
+  }
+
+  for(int vx=0 ; vx<8 ; vx++){
+    const int id = edge_ids[vx];
+    ends[0] = m_vertices.at(edges[2 * vx + 0]);
+    ends[1] = m_vertices.at(edges[2 * vx + 1]);
+    m_edges[id] = std::make_shared<SegGeom>(id, 3, ends, nullptr);
+  }
+
+  int index = 0;
+  for(int vx=0 ; vx<5 ; vx++){
+    const int id = face_ids[vx];
+    const int count = face_edge_counts[vx];
+    for(int ix=0 ; ix<count ; ix++){
+      ee[ix] = m_edges.at(faces[index++]);
+    }
+    if (count == 3){
+      m_faces[id] = std::make_shared<TriGeom>(id, ee, nullptr);
+    } else if (count ==4){
+      m_faces[id] = std::make_shared<QuadGeom>(id, ee, nullptr);
+    } else {
+      nprint("ERROR BAD EDGE COUNT");
+    }
+    ff[vx] = m_faces.at(id);
+  }
+
+  auto pyr = std::make_shared<PyrGeom>(1, ff);
+  pyr->GetGeomFactors();
+  pyr->Setup();
+
+  return pyr;
+}
+
+
 int main(int argc, char ** argv){
-  auto pyr = make_problem_pyramid();
-
-  Array<OneD, NekDouble> xi_print(3);
-  xi_print[0] = -0.125;
-  xi_print[1] = -0.125;
-  xi_print[2] =  0.125;
-
-  // Check that X and X^-1 are consistent
-  nprint("\nConsistency check, mapping point from physical to local and back to physical:");
-  // Create a global (physical space) coordinate
-  Array<OneD, NekDouble> global_coord(3);
-  for (int dx = 0; dx < 3; dx++) {
-    global_coord[dx] = pyr->GetCoord(dx, xi_print);
-  }
-
-  // map back to reference space
-  Array<OneD, NekDouble> xi(3);
-  NekDouble dist;
-  auto is_contained = pyr->ContainsPoint(global_coord, xi, 1.0e-12, dist);
-  nprint("is_contained:", (int) is_contained);
-
-  // map the local coord back to global space
-  Array<OneD, NekDouble> global_coord_check(3);
-  for (int dx = 0; dx < 3; dx++) {
-    global_coord_check[dx] = pyr->GetCoord(dx, xi);
-  }
-
-  // print both global coordinates
-  nprint("0:", global_coord[0], global_coord[1], global_coord[2]);
-  nprint("1:", global_coord_check[0], global_coord_check[1], global_coord_check[2]);
-  nprint("error:", l2_norm(global_coord_check, global_coord));
+  auto pyr_non_linear = make_problem_pyramid();
+  auto pyr_linear = make_linear_problem_pyramid();
   
+  std::vector<std::shared_ptr<PyrGeom>> geoms = {pyr_non_linear, pyr_linear};
+  
+  for (auto pyr : geoms){
+
+    Array<OneD, NekDouble> xi_print(3);
+    xi_print[0] = -0.125;
+    xi_print[1] = -0.125;
+    xi_print[2] =  0.125;
+
+    // Check that X and X^-1 are consistent
+    nprint("\nConsistency check, mapping point from physical to local and back to physical:");
+    // Create a global (physical space) coordinate
+    Array<OneD, NekDouble> global_coord(3);
+    for (int dx = 0; dx < 3; dx++) {
+      global_coord[dx] = pyr->GetCoord(dx, xi_print);
+    }
+
+    // map back to reference space
+    Array<OneD, NekDouble> xi(3);
+    NekDouble dist;
+    auto is_contained = pyr->ContainsPoint(global_coord, xi, 1.0e-12, dist);
+    nprint("is_contained:", (int) is_contained);
+
+    // map the local coord back to global space
+    Array<OneD, NekDouble> global_coord_check(3);
+    for (int dx = 0; dx < 3; dx++) {
+      global_coord_check[dx] = pyr->GetCoord(dx, xi);
+    }
+
+    // print both global coordinates
+    nprint("0:", global_coord[0], global_coord[1], global_coord[2]);
+    nprint("1:", global_coord_check[0], global_coord_check[1], global_coord_check[2]);
+    nprint("error:", l2_norm(global_coord_check, global_coord));
+
+  }
+
   return 0;
 }
 
